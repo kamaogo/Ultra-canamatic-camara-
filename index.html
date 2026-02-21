@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CineBeast Pro - Android Edition</title>
+    <style>
+        :root { --accent: #00f2ff; --record: #ff3b30; --bg: #000; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: 'Segoe UI', sans-serif; }
+
+        /* ক্যামেরা স্ক্রিন */
+        #cameraPage { position: fixed; width: 100%; height: 100%; z-index: 5; }
+        video { 
+            width: 100%; height: 100%; object-fit: cover; 
+            filter: contrast(1.3) saturate(2.5) brightness(1.05); 
+        }
+        
+        /* গ্লসি ইউআই কন্ট্রোলস */
+        .bottom-nav { 
+            position: absolute; bottom: 40px; width: 100%; 
+            display: flex; justify-content: space-around; align-items: center; z-index: 10;
+            padding: 0 20px;
+        }
+
+        /* অ্যান্ড্রয়েড স্টাইল আইকন বাটন */
+        .icon-btn {
+            width: 55px; height: 55px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer; transition: 0.3s;
+        }
+        .icon-btn:active { transform: scale(0.85); background: rgba(255, 255, 255, 0.2); }
+        .icon-btn svg { width: 28px; height: 28px; fill: white; filter: drop-shadow(0 0 5px var(--accent)); }
+
+        /* মেইন শাটার */
+        .shutter-wrap {
+            width: 90px; height: 90px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: 4px solid #fff;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+        }
+        .shutter-main { 
+            width: 70px; height: 70px; background: #fff; border-radius: 50%; 
+            transition: 0.3s; box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+        .shutter-wrap:active .shutter-main { transform: scale(0.9); background: var(--accent); }
+
+        /* প্রিভিউ পেজ */
+        #previewPage { 
+            position: fixed; width: 100%; height: 100%; background: #050505; 
+            display: none; flex-direction: column; align-items: center; z-index: 100; 
+        }
+
+        .img-card {
+            position: relative; width: 92%; height: 60%; margin-top: 20px;
+            border-radius: 25px; overflow: hidden; background: #111;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 1px solid #222;
+        }
+        #outputImg { width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+
+        /* রিভিল অ্যানিমেশন */
+        .reveal-active #outputImg { animation: revealEffect 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes revealEffect {
+            0% { opacity: 0; transform: scale(1.15) rotate(2deg); filter: blur(20px); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0px); }
+        }
+
+        .shimmer-wave {
+            position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.3), transparent);
+            transform: skewX(-30deg); z-index: 101;
+        }
+        .reveal-active .shimmer-wave { animation: slide 1.2s ease-in-out; }
+        @keyframes slide { from { left: -120%; } to { left: 150%; } }
+
+        /* এ্যাড ও বাটন */
+        .ad-area { 
+            width: 92%; height: 85px; background: #111; margin: 25px 0; 
+            border-radius: 15px; border: 1px dashed #333; display: flex; 
+            align-items: center; justify-content: center; color: #555; font-size: 11px;
+        }
+        .next-btn { 
+            padding: 18px 60px; background: var(--accent); color: #000; 
+            border: none; font-weight: 800; border-radius: 40px; 
+            box-shadow: 0 10px 20px rgba(0, 242, 255, 0.2); cursor: pointer;
+        }
+
+        /* প্রসেসিং লোডার */
+        #loader {
+            position: fixed; width: 100%; height: 100%; background: rgba(0,0,0,0.9);
+            display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 200;
+        }
+        .neon-circle { width: 60px; height: 60px; border: 3px solid #111; border-top: 3px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="cameraPage">
+        <video id="v" autoplay playsinline></video>
+        <div class="bottom-nav">
+            <div class="icon-btn" onclick="flipCam()">
+                <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5c-1.1 0-2 .9-2 2v7h2V7zm10 10H7v-3l-4 4 4 4v-3h12c1.1 0 2-.9 2-2V9h-2v7z"/></svg>
+            </div>
+            
+            <div class="shutter-wrap" onclick="snap()">
+                <div class="shutter-main"></div>
+            </div>
+
+            <div class="icon-btn" onclick="alert('ভিডিও মোড চালু হচ্ছে...')">
+                <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewPage">
+        <div class="img-card" id="card">
+            <img id="outputImg">
+            <div class="shimmer-wave"></div>
+        </div>
+        <div class="ad-area">ADVERTISEMENT (EARN REVENUE HERE)</div>
+        <button class="next-btn" onclick="reset()">RETAKE SHOT</button>
+    </div>
+
+    <div id="loader">
+        <div class="neon-circle"></div>
+        <p style="color:var(--accent); margin-top:20px; font-weight:bold; letter-spacing:2px;">CINEBEAST ENHANCING...</p>
+    </div>
+
+    <canvas id="c" style="display:none;"></canvas>
+
+    <script>
+        const v = document.getElementById('v'), 
+              pImg = document.getElementById('outputImg'),
+              camP = document.getElementById('cameraPage'),
+              preP = document.getElementById('previewPage'),
+              loader = document.getElementById('loader'),
+              card = document.getElementById('card');
+
+        let mode = 'environment';
+
+        async function start() {
+            try {
+                if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop());
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: mode, width: { ideal: 3840 } }
+                });
+                v.srcObject = stream;
+            } catch (e) { alert("Camera Access Denied!"); }
+        }
+
+        function snap() {
+            loader.style.display = 'flex';
+            setTimeout(() => {
+                const canvas = document.getElementById('c');
+                const ctx = canvas.getContext('2d');
+                canvas.width = v.videoWidth;
+                canvas.height = v.videoHeight;
+                ctx.filter = "contrast(1.3) saturate(2.5) brightness(1.05)";
+                ctx.drawImage(v, 0, 0);
+                
+                const data = canvas.toDataURL('image/jpeg', 1.0);
+                
+                // অটো ডাউনলোড
+                const link = document.createElement('a');
+                link.download = `CineBeast_${Date.now()}.jpg`;
+                link.href = data;
+                link.click();
+
+                pImg.src = data;
+                loader.style.display = 'none';
+                camP.style.display = 'none';
+                preP.style.display = 'flex';
+                setTimeout(() => card.classList.add('reveal-active'), 100);
+            }, 1200);
+        }
+
+        function reset() {
+            card.classList.remove('reveal-active');
+            preP.style.display = 'none';
+            camP.style.display = 'block';
+            start();
+        }
+
+        function flipCam() {
+            mode = (mode === 'user') ? 'environment' : 'user';
+            start();
+        }
+
+        start();
+    </script>
+</body>
+</html>
